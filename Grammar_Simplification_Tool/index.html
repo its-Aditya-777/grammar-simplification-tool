@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grammar Simplification Tool</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+  <h1>Grammar Simplification Tool</h1>
+  <p>Visualize simplification of Context-Free Grammars</p>
+
+  <textarea id="grammarInput">S -> ASA | aB
+A -> B | S
+B -> b | ε</textarea>
+
+  <button onclick="simplify()">Simplify Grammar</button>
+
+  <div id="output"></div>
+
+  <!-- <div class="footer">made by aditya THE brat :~) 🚀</div> -->
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
