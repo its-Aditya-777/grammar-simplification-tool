@@ -1,167 +1,133 @@
-const isNonTerminal = s => /^[A-Z]$/.test(s);
-const uniq = arr => [...new Set(arr)];
-function clone(obj){ return JSON.parse(JSON.stringify(obj)); }
-
-function formatGrammar(g){
-  return Object.keys(g).map(k => `${k} → ${g[k].join(' | ')}`).join('<br>');
-}
-
-function display(title, grammar){
-  const div = document.createElement('div');
-  div.className = 'step';
-  div.innerHTML = `<h3>${title}</h3><p>${formatGrammar(grammar)}</p>`;
-  document.getElementById('output').appendChild(div);
-}
-
-function parseGrammar(input){
-  const lines = input.split('\n').map(l=>l.trim()).filter(Boolean);
-  const g = {};
-  lines.forEach(line => {
-    const [lhs, rhs] = line.split('->').map(x=>x.trim());
-    const alts = rhs.split('|').map(r=>r.trim());
-    g[lhs] = uniq((g[lhs]||[]).concat(alts));
-  });
-  return g;
-}
-
-function computeNullable(g){
-  const nullable = new Set();
-  let changed = true;
-  while(changed){
-    changed = false;
-    for(const A in g){
-      for(const rhs of g[A]){
-        if(rhs === 'ε' || rhs.split('').every(ch => nullable.has(ch))){
-          if(!nullable.has(A)){ nullable.add(A); changed = true; }
+document.addEventListener('DOMContentLoaded', () => {
+    // Elements
+    const themeToggle = document.getElementById('theme-toggle');
+    const moonIcon = document.getElementById('moon-icon');
+    const sunIcon = document.getElementById('sun-icon');
+    
+    const btnSimplify = document.getElementById('btn-simplify');
+    const btnExample = document.getElementById('btn-example');
+    const btnClear = document.getElementById('btn-clear');
+    
+    const grammarInput = document.getElementById('grammar-input');
+    const errorMsg = document.getElementById('error-message');
+    const resultsSection = document.getElementById('results-section');
+    
+    const btnText = document.querySelector('.btn-text');
+    const loader = document.querySelector('.loader');
+    // Theme Toggle
+    themeToggle.addEventListener('click', () => {
+        const root = document.documentElement;
+        if (root.getAttribute('data-theme') === 'dark') {
+            root.setAttribute('data-theme', 'light');
+            moonIcon.style.display = 'block';
+            sunIcon.style.display = 'none';
+        } else {
+            root.setAttribute('data-theme', 'dark');
+            moonIcon.style.display = 'none';
+            sunIcon.style.display = 'block';
         }
-      }
-    }
-  }
-  return nullable;
-}
-
-function removeNullProductions(g, start){
-  const nullable = computeNullable(g);
-  const newG = {};
-
-  for(const A in g){
-    const results = new Set();
-    for(const rhs of g[A]){
-      if(rhs === 'ε') continue;
-      const chars = rhs.split('');
-      const pos = [];
-      chars.forEach((ch,i)=>{ if(nullable.has(ch)) pos.push(i); });
-
-      const total = 1 << pos.length;
-      for(let mask=0; mask<total; mask++){
-        const temp = chars.slice();
-        for(let j=0;j<pos.length;j++){
-          if(mask & (1<<j)) temp[pos[j]] = '';
-        }
-        const candidate = temp.join('') || 'ε';
-        results.add(candidate);
-      }
-    }
-    newG[A] = uniq([...results].filter(r => r !== 'ε'));
-  }
-
-  if(nullable.has(start)){
-    newG[start].push('ε');
-  }
-  return newG;
-}
-
-function removeUnitProductions(g){
-  const newG = {};
-  const nts = Object.keys(g);
-
-  const closure = {};
-  nts.forEach(A => {
-    closure[A] = new Set([A]);
-    const stack = [A];
-    while(stack.length){
-      const X = stack.pop();
-      (g[X]||[]).forEach(rhs => {
-        if(rhs.length === 1 && isNonTerminal(rhs)){
-          if(!closure[A].has(rhs)){
-            closure[A].add(rhs);
-            stack.push(rhs);
-          }
-        }
-      });
-    }
-  });
-
-  nts.forEach(A => {
-    const set = new Set();
-    closure[A].forEach(B => {
-      (g[B]||[]).forEach(rhs => {
-        if(!(rhs.length === 1 && isNonTerminal(rhs))){
-          set.add(rhs);
-        }
-      });
     });
-    newG[A] = uniq([...set]);
-  });
-
-  return newG;
-}
-
-function removeUselessSymbols(g, start){
-  const generating = new Set();
-  let changed = true;
-  while(changed){
-    changed = false;
-    for(const A in g){
-      for(const rhs of g[A]){
-        if(rhs === 'ε' || rhs.split('').every(ch => !isNonTerminal(ch) || generating.has(ch))){
-          if(!generating.has(A)){ generating.add(A); changed = true; }
-        }
-      }
-    }
-  }
-
-  const g1 = {};
-  for(const A in g){
-    if(!generating.has(A)) continue;
-    g1[A] = g[A].filter(rhs => rhs.split('').every(ch => !isNonTerminal(ch) || generating.has(ch)));
-  }
-
-  const reachable = new Set([start]);
-  const stack = [start];
-  while(stack.length){
-    const A = stack.pop();
-    (g1[A]||[]).forEach(rhs => {
-      rhs.split('').forEach(ch => {
-        if(isNonTerminal(ch) && !reachable.has(ch)){
-          reachable.add(ch);
-          stack.push(ch);
-        }
-      });
+    // Copy to Clipboard Buttons
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const card = e.currentTarget.closest('.glass-card');
+            const display = card.querySelector('.grammar-display');
+            const textToCopy = display.innerText;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                const originalSvg = btn.innerHTML;
+                btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--terminal-color);"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+                setTimeout(() => { btn.innerHTML = originalSvg; }, 2000);
+            });
+        });
     });
-  }
-
-  const g2 = {};
-  for(const A in g1){
-    if(reachable.has(A)){
-      g2[A] = g1[A];
+    // Default Example setup
+    const exampleText = `S -> AB | aC
+A -> aA | e
+B -> Bb | e
+C -> c
+D -> d`;
+    btnExample.addEventListener('click', () => {
+        grammarInput.value = exampleText;
+        clearErrors();
+        simulateInputFeedback();
+    });
+    btnClear.addEventListener('click', () => {
+        grammarInput.value = '';
+        clearErrors();
+        resultsSection.style.display = 'none';
+        document.querySelectorAll('.stage-card').forEach(c => c.classList.remove('show'));
+    });
+    
+    function simulateInputFeedback() {
+        grammarInput.style.backgroundColor = 'rgba(79, 70, 229, 0.1)';
+        setTimeout(() => { grammarInput.style.backgroundColor = ''; }, 300);
     }
-  }
-  return g2;
-}
-
-function simplify(){
-  document.getElementById('output').innerHTML = '';
-
-  const input = document.getElementById('grammarInput').value;
-  let g = parseGrammar(input);
-  const start = Object.keys(g)[0];
-
-  display('Original Grammar', clone(g));
-  g = removeNullProductions(g, start);
-  display('After Removing Null Productions', clone(g));
-  g = removeUnitProductions(g);
-  display('After Removing Unit Productions', clone(g));
-  g = removeUselessSymbols(g, start);
-  display('Final Simplified Grammar', clone(g));
-}
+    function clearErrors() {
+        errorMsg.style.display = 'none';
+        errorMsg.innerText = '';
+        grammarInput.style.borderColor = '';
+    }
+    function showError(msg) {
+        errorMsg.style.display = 'block';
+        errorMsg.innerText = msg;
+        grammarInput.style.borderColor = 'var(--error-text)';
+        resultsSection.style.display = 'none';
+        document.querySelectorAll('.stage-card').forEach(c => c.classList.remove('show'));
+    }
+    // Simplification Process
+    btnSimplify.addEventListener('click', () => {
+        const inputText = grammarInput.value;
+        if (!inputText.trim()) {
+            showError("Please enter a valid CFG.");
+            return;
+        }
+        clearErrors();
+        
+        // Start Loading state
+        btnSimplify.disabled = true;
+        btnText.style.display = 'none';
+        loader.style.display = 'block';
+        // Simulate short calculation delay for UI UX feeling
+        setTimeout(() => {
+            try {
+                // Parse
+                let currentGrammar = parseGrammar(inputText);
+                
+                // Card 1: Original
+                const stageOriginalList = document.querySelector('#stage-original .grammar-display');
+                stageOriginalList.innerHTML = formatGrammarHTML(currentGrammar);
+                // Step 1: Null removal
+                const nullResult = removeNullProductions(currentGrammar);
+                currentGrammar = { grammar: nullResult.grammar, startSymbol: nullResult.startSymbol };
+                document.querySelector('#stage-null .explanation-panel').innerHTML = nullResult.explanation;
+                document.querySelector('#stage-null .grammar-display').innerHTML = formatGrammarHTML(currentGrammar);
+                // Step 2: Unit removal
+                const unitResult = removeUnitProductions(currentGrammar);
+                currentGrammar = { grammar: unitResult.grammar, startSymbol: unitResult.startSymbol };
+                document.querySelector('#stage-unit .explanation-panel').innerHTML = unitResult.explanation;
+                document.querySelector('#stage-unit .grammar-display').innerHTML = formatGrammarHTML(currentGrammar);
+                // Step 3: Useless removal
+                const uselessResult = removeUselessSymbols(currentGrammar);
+                currentGrammar = { grammar: uselessResult.grammar, startSymbol: uselessResult.startSymbol };
+                document.querySelector('#stage-useless .explanation-panel').innerHTML = uselessResult.explanation;
+                document.querySelector('#stage-useless .grammar-display').innerHTML = formatGrammarHTML(currentGrammar);
+                // Reveal Results Sequentially
+                resultsSection.style.display = 'flex';
+                
+                const cards = document.querySelectorAll('.stage-card');
+                cards.forEach((card, index) => {
+                    card.classList.remove('show');
+                    setTimeout(() => {
+                        card.classList.add('show');
+                    }, index * 200 + 100);
+                });
+            } catch (err) {
+                showError(err.message);
+            } finally {
+                btnSimplify.disabled = false;
+                btnText.style.display = 'inline-block';
+                loader.style.display = 'none';
+            }
+        }, 600);
+    });
+});
