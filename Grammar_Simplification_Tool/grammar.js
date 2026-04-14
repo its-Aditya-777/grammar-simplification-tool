@@ -2,7 +2,9 @@ const EPSILON = 'ε';
 const ARROW = '->';
 /**
  * Parses multiline string into a CFG object.
- * Assumes single uppercase letters (A-Z) are variables.
+ * Assumes single uppercase letters (A-Z) are variables and everything else is terminal.
+ * LHS and RHS are separated by '->', '→', or '='. Multiple productions for the same variable can be separated by '|'.
+ * E.g.:
  */
 function parseGrammar(text) {
     const lines = text.split('\n');
